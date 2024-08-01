@@ -5,6 +5,7 @@ import time
 
 from src import (config, web_scraper, event_log)
 
+
 def create_logger(path_log):
     os.makedirs(os.path.dirname(path_log), exist_ok=True)
     logging.basicConfig(

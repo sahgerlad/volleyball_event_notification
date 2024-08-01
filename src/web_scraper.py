@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 
 logger = logging.getLogger(__name__)
 
+
 def start_browser():
     logger.info("Starting browser...")
     chrome_options = Options()
@@ -20,16 +21,14 @@ def get_query_element(driver, url):
     driver.get(url)
     # Add delay for page to fully load
     time.sleep(5)
-    query_element = (
+    elements = (
         driver.find_element(By.CSS_SELECTOR, "main")
-        .find_element(By.CSS_SELECTOR, "div")
-        .find_element(By.CSS_SELECTOR, "div")
-        .find_elements(By.CSS_SELECTOR, "div")[22]
-        .find_elements(By.CSS_SELECTOR, "div")[358]
-        .find_element(By.CSS_SELECTOR, "div")
-        .find_elements(By.CSS_SELECTOR, "div")[80]
+        .find_elements(By.CSS_SELECTOR, "div")
     )
-    return query_element
+    for i, elem in enumerate(elements):
+        if elem.text.startswith("Pickup") and ":" in elem.text:
+            break
+    return elements[i - 3]
 
 
 def get_event_elements(query_element):
@@ -56,6 +55,3 @@ def get_event_ids(driver, url):
         event_elements = get_event_elements(query_element)
     logger.info(f"Retrieved event IDs: {event_ids}")
     return event_ids
-
-
-
