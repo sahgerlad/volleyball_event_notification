@@ -27,7 +27,7 @@ def read_event_ids(file_path):
 def write_event_ids(file_path, event_ids):
     logger.info(f"Writing event IDs to {file_path}...")
     create_event_log_file(file_path)
-    with open(file_path, "w", newline="") as file:
+    with open(file_path, "a", newline="") as file:
         writer = csv.writer(file)
         for event_id in set(event_ids):
             writer.writerow([event_id])
