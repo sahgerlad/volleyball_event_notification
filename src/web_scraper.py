@@ -26,7 +26,7 @@ def get_query_element(driver, url):
         .find_elements(By.CSS_SELECTOR, "div")
     )
     for i, elem in enumerate(elements):
-        if elem.text.startswith("Pickup") and ":" in elem.text:
+        if (elem.text.startswith("Pickup") and ":" in elem.text) or "No results" in elem.text:
             break
     return elements[i - 3]
 
@@ -46,12 +46,15 @@ def get_event_ids(driver, url):
     logger.info(f"Getting event IDs from url: {url}...")
     query_element = get_query_element(driver, url)
     event_elements = get_event_elements(query_element)
+    logger.info(f"Found {len(event_elements)} events")
     event_ids = []
     for idx in range(len(event_elements)):
         event_elements[idx].click()
         time.sleep(1)
-        event_ids.append(driver.current_url.split("/")[-1])
+        event_id = driver.current_url.split("/")[-1]
+        event_ids.append(event_id)
         query_element = get_query_element(driver, url)
         event_elements = get_event_elements(query_element)
-    logger.info(f"Retrieved event IDs: {event_ids}")
+        logger.info(f"Retrieved event ID: {event_id}")
+    logger.info("Retrieved all event IDs.")
     return event_ids
