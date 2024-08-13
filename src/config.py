@@ -1,6 +1,15 @@
+import os
+
 # Web config
 TEST_URL = "https://www.volosports.com/discover?cityName=New%20York%20Metro%20Area&view=SPORTS&subView=DAILY&programTypes%5B%5D=PICKUP&sportNames%5B%5D=Volleyball&venueIds%5B%5D=60ad2493c1e4b9002fdbb04e&venueIds%5B%5D=60ad1c7ca5287c00919ec225&venueIds%5B%5D=601f53343779dc0031b60bef"
 URL = "https://www.volosports.com/discover?cityName=New%20York%20Metro%20Area&view=SPORTS&subView=DAILY&programTypes%5B%5D=PICKUP&sportNames%5B%5D=Volleyball&venueIds%5B%5D=60ad2493c1e4b9002fdbb04e&venueIds%5B%5D=60ad1c7ca5287c00919ec225"
+
+# Email config
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+EMAIL_SENDER = "volo.notification@gmail.com"
+EMAIL_RECIPIENT = "REDACTED"
+APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 # File config
 FILEPATH_LOG = "log/log.txt"
