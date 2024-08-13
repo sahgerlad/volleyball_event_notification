@@ -3,7 +3,7 @@ import os
 import sys
 import time
 
-from src import (config, web_scraper, event_log)
+from src import (config, web_scraper, event_log, emailer)
 
 
 def create_logger(path_log):
@@ -27,6 +27,7 @@ def main(url, filepath):
         event_ids = list(set(event_ids) - set(existing_event_ids))
         if event_ids:
             event_log.write_event_ids(filepath, event_ids)
+            emailer.send_email(["test"])
         else:
             logger.info("No new event IDs")
     else:
