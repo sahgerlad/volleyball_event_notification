@@ -34,8 +34,7 @@ def create_email_content_job_failure(error):
         "subject": "Volo web scraper job failed",
         "body": "\n".join([
             "Volo notification job failed.",
-            "",
-            "Error:",
+            "\nError:",
             f"    {error}"
         ])
     }
@@ -52,7 +51,7 @@ def send_email(subject, body):
     try:
         with smtplib.SMTP("smtp.gmail.com", config.SMTP_PORT) as server:
             server.starttls()
-            server.login(config.EMAIL_SENDER, config.APP_PASSWORD)  # Use app password here
+            server.login(config.EMAIL_SENDER, config.APP_PASSWORD)
             server.sendmail(config.EMAIL_SENDER, config.EMAIL_RECIPIENT, msg.as_string())
         logger.info("Email sent successfully.")
     except Exception as e:

@@ -67,6 +67,7 @@ if __name__ == "__main__":
             if retry_counter == config.RETRY_LIMIT:
                 logger.fatal("Retry limit exceeded.")
                 emailer.send_email(**emailer.create_email_content_job_failure(e))
+                logger.fatal("Exiting the program...")
                 sys.exit(1)
             logger.info(f"Sleeping for {(config.SLEEP_TIME_RETRY / 60):.1f} minutes")
             time.sleep(config.SLEEP_TIME_RETRY)
