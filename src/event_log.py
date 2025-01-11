@@ -4,6 +4,7 @@ import csv
 
 logger = logging.getLogger(__name__)
 
+
 def create_event_log_file(file_path):
     if not os.path.exists(file_path):
         logger.info(f"Creating event log file in {file_path}...")
