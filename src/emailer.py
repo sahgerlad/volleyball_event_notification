@@ -1,3 +1,4 @@
+import sys
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -10,9 +11,14 @@ logger = logging.getLogger(__name__)
 
 def event_info_string(event_info, indent=4):
     indent = " " * indent
+    if sys.platform.startswith("win"):
+        strftime_modifier = "#"
+    else:
+        strftime_modifier = "-"
     string = (
-        f"{indent}Date: {event_info['start_time'].strftime('%-m/%-d (%A)')} from "
-        f"{event_info['start_time'].strftime('%-I:%M %p')} to {event_info['end_time'].strftime('%-I:%M %p')}"
+        f"{indent}Date: {event_info['start_time'].strftime(f'%{strftime_modifier}m/%{strftime_modifier}d (%A)')} from "
+        f"{event_info['start_time'].strftime(f'%{strftime_modifier}I:%M %p')} to "
+        f"{event_info['end_time'].strftime(f'%{strftime_modifier}I:%M %p')}"
     )
     string += f"\n{indent}Location: {event_info['location']}"
     if event_info["level"]:

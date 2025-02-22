@@ -21,7 +21,7 @@ def read_event_ids(file_path):
     with open(file_path, "r", newline="") as file:
         reader = csv.reader(file)
         event_ids = [row[0] for row in reader]
-    logger.info(f"Retrieved event IDs: {event_ids}")
+    logger.info(f"Retrieved {len(event_ids)} event IDs.")
     return event_ids
 
 
@@ -32,5 +32,5 @@ def write_event_ids(file_path, event_ids):
         writer = csv.writer(file)
         for event_id in set(event_ids):
             writer.writerow([event_id])
-    logger.info(f"New event IDs written: {event_ids}")
+    logger.info(f"{len(event_ids)} new event IDs written.")
     return

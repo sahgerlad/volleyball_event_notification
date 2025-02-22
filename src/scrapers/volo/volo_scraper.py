@@ -3,25 +3,12 @@ import time
 from datetime import datetime as dt
 
 import selenium.common
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from src import config
 
 logger = logging.getLogger(__name__)
-
-
-def start_browser(headless=True):
-    logger.info("Starting browser...")
-    chrome_options = Options()
-    if headless:
-        chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.set_window_size(1920, 1080)
-    logger.info("Browser started.")
-    return driver
 
 
 def login_to_account(driver, url, volo_account, volo_password):
@@ -104,7 +91,7 @@ def get_event_elements(query_element, account_login: bool):
                     continue
             except IndexError:
                 logger.debug(
-                    f"Event capacity could not be found: {element.find_elements(By.XPATH, ".//div[@dir]")[-1].text}"
+                    f"Event capacity could not be found: {element.find_elements(By.XPATH, './/div[@dir]')[-1].text}"
                 )
         valid_event_elements.append(element)
     return valid_event_elements
