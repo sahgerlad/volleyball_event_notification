@@ -2,7 +2,9 @@ import logging
 import os
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from src import config
+
+logger = logging.getLogger(config.LOGGER_NAME)
 
 
 def read_local_events(file_path) -> pd.DataFrame:

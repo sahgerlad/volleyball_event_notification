@@ -12,7 +12,7 @@ from src import event_log, emailer, config
 from src.scrapers.volo import volo_scraper, volo_config
 from src.scrapers.big_city import big_city_scraper as bc_scraper, big_city_config as bc_config
 
-default_logger = logging.getLogger("default_logger")
+logger = logging.getLogger(config.LOGGER_NAME)
 
 
 def create_logger(path_log: str, logger_name: str = None):
@@ -34,7 +34,7 @@ def create_logger(path_log: str, logger_name: str = None):
     return logger
 
 
-def start_browser(headless=True, logger=default_logger):
+def start_browser(headless=True, logger=logger):
     logger.info("Starting browser...")
     chrome_options = Options()
     if headless:
@@ -58,8 +58,8 @@ async def main_big_city(url: str, df_seen_events: pd.DataFrame = None) -> list[d
             new_events = bc_scraper.get_events(driver, url)
             driver.quit()
             retry_counter["big_city"] = 0
+            new_events = bc_scraper.remove_filled_events(new_events)
             new_events = bc_scraper.keep_advanced_events(new_events)
-            new_events = bc_scraper.remove_full_events(new_events)
             new_events = bc_scraper.remove_seen_events(new_events, seen_event_ids)
             logger.info(f"Big City webscrape completed successfully. Found {len(new_events)} new events.")
         except Exception as e:
