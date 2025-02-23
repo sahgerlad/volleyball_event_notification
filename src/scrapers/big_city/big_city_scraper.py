@@ -5,8 +5,9 @@ from datetime import datetime as dt
 from selenium.webdriver.common.by import By
 
 from src import config
+from src.scrapers.big_city import big_city_config as bc_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(bc_config.LOGGER_NAME)
 
 
 def load_query_results_page(driver, url: str) -> None:
@@ -25,6 +26,7 @@ def load_query_results_page(driver, url: str) -> None:
 
 def get_event_info(event_element) -> dict:
     url = event_element.find_element(*(By.CSS_SELECTOR, "a")).get_attribute("href")
+    event_id = url.split("/")[4].split("?")[0]
     event_details = event_element.text.split("\n")
     status = "Available"
     if event_details[0] in ["Filled", "Upcoming"]:
@@ -45,9 +47,10 @@ def get_event_info(event_element) -> dict:
     price = None
     if event_details:
         price = event_details.pop(0)
+    logger.debug(f"Retrieved event ID {event_id}.")
     return {
         "organization": "Big City",
-        "event_id": url.split("/")[4].split("?")[0],
+        "event_id": event_id,
         "location": location,
         "start_time": start_datetime,
         "end_time": end_datetime,
@@ -59,6 +62,7 @@ def get_event_info(event_element) -> dict:
 
 
 def get_registration_datetime(driver, url: str) -> dt:
+    logger.debug(f"Getting registration date on url: {url}...")
     driver.execute_script("window.open('');")
     driver.switch_to.window(driver.window_handles[1])
     try:
@@ -72,6 +76,7 @@ def get_registration_datetime(driver, url: str) -> dt:
         )
         if reg_datetime < dt.now():
             reg_datetime = reg_datetime.replace(reg_datetime.year + 1)
+        logger.debug(f"Found registration date: {reg_datetime}")
     except Exception as e:
         logger.exception(f"Exception raised when collecting the registration datetime on url {url}: {e}")
         reg_datetime = None
@@ -81,6 +86,7 @@ def get_registration_datetime(driver, url: str) -> dt:
 
 
 def get_events(driver, url: str) -> list[dict]:
+    logger.info(f"Getting events...")
     load_query_results_page(driver, url)
     events = []
     event_elements = (
@@ -96,34 +102,44 @@ def get_events(driver, url: str) -> list[dict]:
     for event_info in events:
         if event_info["status"] == "Upcoming":
             event_info["registration_date"] = get_registration_datetime(driver, event_info["url"])
+    logger.info("Retrieved all event info.")
     return events
 
 
-def remove_full_events(events: list) -> list:
+def remove_filled_events(events: list) -> list:
+    logger.info("Removing filled events...")
+    num_total_events = len(events)
     i = 0
     while i < len(events):
         if events[i]["status"] == "Filled":
-            events.pop(i)
+            logger.debug(f"Event ID {events.pop(i)['event_id']} removed.")
         else:
             i += 1
+    logger.info(f"{num_total_events - len(events)} of {num_total_events} removed. {len(events)} remaining.")
     return events
 
 
 def remove_seen_events(new_events: list, existing_event_ids: list):
+    logger.info("Removing seen events...")
+    num_total_events = len(new_events)
     i = 0
     while i < len(new_events):
         if new_events[i]["event_id"] in existing_event_ids:
-            new_events.pop(i)
+            logger.debug(f"Event ID {new_events.pop(i)['event_id']} removed.")
         else:
             i += 1
+    logger.info(f"{num_total_events - len(new_events)} of {num_total_events} removed. {len(new_events)} remaining.")
     return new_events
 
 
-def keep_advanced_events(new_events: list):
+def keep_advanced_events(events: list):
+    logger.info("Keeping only advanced events...")
+    num_total_events = len(events)
     i = 0
-    while i < len(new_events):
-        if new_events[i]["level"] != "Advanced":
-            new_events.pop(i)
+    while i < len(events):
+        if events[i]["level"] != "Advanced":
+            logger.debug(f"Event ID {events.pop(i)['event_id']} removed.")
         else:
             i += 1
-    return new_events
+    logger.info(f"{num_total_events - len(events)} of {num_total_events} removed. {len(events)} remaining.")
+    return events

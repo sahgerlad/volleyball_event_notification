@@ -6,7 +6,7 @@ import logging
 
 from src import config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(config.LOGGER_NAME)
 
 
 def event_info_string(event_info, indent=4):

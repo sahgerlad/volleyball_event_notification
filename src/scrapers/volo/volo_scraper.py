@@ -7,8 +7,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from src import config
+from src.scrapers.volo import volo_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(volo_config.LOGGER_NAME)
 
 
 def login_to_account(driver, url, volo_account, volo_password):
