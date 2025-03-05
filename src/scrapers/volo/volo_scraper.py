@@ -13,7 +13,7 @@ logger = logging.getLogger(volo_config.LOGGER_NAME)
 
 
 def login_to_account(driver, url, volo_account, volo_password):
-    logger.info(f"Logging into Volo account with username {volo_account}: {url}...")
+    logger.info(f"Logging into {volo_config.ORG_DISPLAY_NAME} account with username {volo_account}: {url}...")
     account_login = False
     driver.execute_script("window.open('');")
     driver.switch_to.window(driver.window_handles[1])
@@ -26,22 +26,22 @@ def login_to_account(driver, url, volo_account, volo_password):
         password_element.send_keys(Keys.RETURN)
         time.sleep(config.SLEEP_TIME_URL_LOAD)
         if driver.current_url == url:
-            logger.error(f"Login attempt to Volo account unsuccessful.")
+            logger.error(f"Login attempt to {volo_config.ORG_DISPLAY_NAME} account unsuccessful.")
         else:
             account_login = True
-            logger.info(f"Login to Volo account successful.")
+            logger.info(f"Login to {volo_config.ORG_DISPLAY_NAME} account successful.")
     except Exception as e:
-        logger.exception(f"Error when attempting to log into the Volo account: {e}")
+        logger.exception(f"Error when attempting to log into the {volo_config.ORG_DISPLAY_NAME} account: {e}")
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
     return account_login
 
 
 def load_query_results_page(driver, url):
-    logger.debug(f"Loading Volo query page: {url}...")
+    logger.debug(f"Loading {volo_config.ORG_DISPLAY_NAME} query page: {url}...")
     driver.get(url)
     time.sleep(config.SLEEP_TIME_PAGE_LOAD)
-    logger.debug(f"Volo query page loaded.")
+    logger.debug(f"{volo_config.ORG_DISPLAY_NAME} query page loaded.")
 
 
 def get_query_element(driver):
@@ -119,13 +119,14 @@ def get_event_info(driver):
     location = event_details[3] + ", " + event_details[1]
     level = event_details[4] if len(event_details) >= 5 else None
     return {
-        "organization": "Volo",
+        "organization": volo_config.ORG_DISPLAY_NAME,
         "event_id": event_id,
         "location": location,
         "start_time": start_datetime,
         "end_time": end_datetime,
         "level": level,
-        "url": f"https://www.volosports.com/d/{event_id}"
+        "url": f"https://www.volosports.com/d/{event_id}",
+        "date_found": dt.now()
     }
 
 
@@ -165,7 +166,7 @@ def get_events(driver, url: str, account_login: bool, existing_events: list = No
                 registration_confirmed = False
                 if (
                     account_login
-                    and (event_info["start_time"] - dt.now()).total_seconds() > config.SIGNUP_NOTICE
+                    and (event_info["start_time"] - dt.now()).total_seconds() > volo_config.SIGNUP_NOTICE
                     and check_free_event(driver)
                 ):
                     registration_confirmed = event_registration(driver)
