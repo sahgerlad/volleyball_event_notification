@@ -12,7 +12,7 @@ logger = logging.getLogger(bc_config.LOGGER_NAME)
 
 
 def load_query_results_page(driver, url: str) -> None:
-    logger.debug(f"Loading Big City query page: {url}...")
+    logger.debug(f"Loading {bc_config.ORG_DISPLAY_NAME} query page: {url}...")
     driver.get(url)
     time.sleep(config.SLEEP_TIME_PAGE_LOAD)
     iframe = driver.find_element(By.TAG_NAME, "iframe")
@@ -22,7 +22,7 @@ def load_query_results_page(driver, url: str) -> None:
         load_more_button[0].click()
         time.sleep(config.SLEEP_TIME_URL_LOAD)
         load_more_button = driver.find_elements(By.XPATH, "//span[text()='Load More']")
-    logger.debug(f"Big City query page loaded.")
+    logger.debug(f"{bc_config.ORG_DISPLAY_NAME} query page loaded.")
 
 
 def get_event_info(event_element) -> dict:
@@ -50,15 +50,16 @@ def get_event_info(event_element) -> dict:
         price = event_details.pop(0)
     logger.debug(f"Retrieved event ID {event_id}.")
     return {
-        "organization": "Big City",
+        "organization": bc_config.ORG_DISPLAY_NAME,
         "event_id": event_id,
         "location": location,
         "start_time": start_datetime,
         "end_time": end_datetime,
         "level": level,
         "status": status,
-        "price": price,
-        "url": url
+        "price": price.strip("$") if isinstance(price, str) and "$" in price else price,
+        "url": url,
+        "date_found": dt.now()
     }
 
 

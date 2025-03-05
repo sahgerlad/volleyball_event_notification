@@ -12,8 +12,8 @@ def read_local_events(file_path) -> pd.DataFrame:
     if os.path.exists(file_path):
         df_events = pd.read_csv(file_path)
     else:
-        df_events = pd.DataFrame({"organization": [], "event_id": []})
-        df_events = df_events.astype({"organization": str, "event_id": str})
+        df_events = pd.DataFrame({"organization": [], "event_id": [], "status": []})
+        df_events = df_events.astype({"organization": str, "event_id": str, "status": str})
     logger.info(f"Retrieved {len(df_events)} event IDs.")
     return df_events
 

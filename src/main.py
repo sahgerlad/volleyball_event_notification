@@ -9,8 +9,9 @@ from selenium.webdriver.chrome.options import Options
 import pandas as pd
 
 from src import event_log, emailer, config
-from src.scrapers.volo import volo_scraper, volo_config
 from src.scrapers.big_city import big_city_scraper as bc_scraper, big_city_config as bc_config
+from src.scrapers.new_york_urban import new_york_urban_scraper as nyu_scraper, new_york_urban_config as nyu_config
+from src.scrapers.volo import volo_scraper, volo_config
 
 logger = logging.getLogger(config.LOGGER_NAME)
 
@@ -54,22 +55,52 @@ async def main_big_city(url: str, df_seen_events: pd.DataFrame = None) -> list[d
             bc_config.LOGGER_NAME
         )
         try:
-            logger.info(f"Starting Big City scraper on {url}...")
-            df_seen_events = df_seen_events[df_seen_events["organization"] == "Big City"]
+            logger.info(f"Starting {bc_config.ORG_DISPLAY_NAME} scraper on {url}...")
+            df_seen_events = df_seen_events[df_seen_events["organization"] == bc_config.ORG_DISPLAY_NAME]
             driver = start_browser(logger=logger)
             new_events = bc_scraper.get_events(driver, url)
             driver.quit()
-            retry_counter["big_city"] = 0
+            retry_counter[bc_config.ORGANIZATION] = 0
             new_events = bc_scraper.keep_advanced_events(new_events)
             new_events = bc_scraper.remove_seen_events(new_events, df_seen_events)
-            logger.info(f"Big City webscrape completed successfully. Found {len(new_events)} new events.")
+            for event in new_events:
+                logger.info(f"Found new event ID: {event['event_id']}")
+            logger.info(f"{bc_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
         except Exception as e:
-            retry_counter["big_city"] += 1
-            logger.warning(f"Execution failed. Incrementing retry counter: {retry_counter["big_city"]}")
+            retry_counter[bc_config.ORGANIZATION] += 1
+            logger.warning(f"Execution failed. Incrementing retry counter: {retry_counter[bc_config.ORGANIZATION]}")
             logger.exception(e)
             new_events = []
         return new_events
     return await asyncio.to_thread(big_city, url, df_seen_events)
+
+
+async def main_new_york_urban(url: str, df_seen_events: pd.DataFrame = None) -> list[dict]:
+    def new_york_urban(url: str, df_seen_events: pd.DataFrame = None) -> list[dict]:
+        logger = create_logger(
+            nyu_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")),
+            nyu_config.LOGGER_NAME
+        )
+        try:
+            logger.info(f"Starting {nyu_config.ORG_DISPLAY_NAME} scraper on {url}...")
+            seen_event_ids = df_seen_events[df_seen_events["organization"] == nyu_config.ORG_DISPLAY_NAME]["event_id"].to_list()
+            driver = start_browser(logger=logger)
+            new_events = nyu_scraper.get_events(driver, url)
+            driver.quit()
+            retry_counter[nyu_config.ORGANIZATION] = 0
+            new_events = nyu_scraper.remove_beginner_events(new_events)
+            new_events = nyu_scraper.remove_full_events(new_events)
+            new_events = nyu_scraper.remove_seen_events(new_events, seen_event_ids)
+            for event in new_events:
+                logger.info(f"Found new event ID: {event['event_id']}")
+            logger.info(f"{nyu_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
+        except Exception as e:
+            retry_counter[nyu_config.ORGANIZATION] += 1
+            logger.warning(f"Execution failed. Incrementing retry counter: {retry_counter[nyu_config.ORGANIZATION]}")
+            logger.exception(e)
+            new_events = []
+        return new_events
+    return await asyncio.to_thread(new_york_urban, url, df_seen_events)
 
 
 async def main_volo(url: str, df_seen_events: pd.DataFrame = None) -> list[dict]:
@@ -79,8 +110,8 @@ async def main_volo(url: str, df_seen_events: pd.DataFrame = None) -> list[dict]
             volo_config.LOGGER_NAME
         )
         try:
-            logger.info(f"Starting Volo scraper on {url}...")
-            seen_event_ids = df_seen_events[df_seen_events["organization"] == "Volo"]["event_id"].to_list()
+            logger.info(f"Starting {volo_config.ORG_DISPLAY_NAME} scraper on {url}...")
+            seen_event_ids = df_seen_events[df_seen_events["organization"] == volo_config.ORG_DISPLAY_NAME]["event_id"].to_list()
             driver = start_browser(logger=logger)
             account_login = volo_scraper.login_to_account(
                 driver,
@@ -90,11 +121,11 @@ async def main_volo(url: str, df_seen_events: pd.DataFrame = None) -> list[dict]
             )
             new_events = volo_scraper.get_events(driver, url, account_login, seen_event_ids)
             driver.quit()
-            retry_counter["volo"] = 0
-            logger.info(f"Volo webscrape completed successfully. Found {len(new_events)} new events.")
+            retry_counter[volo_config.ORGANIZATION] = 0
+            logger.info(f"{volo_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
         except Exception as e:
-            retry_counter["volo"] += 1
-            logger.warning(f"Execution failed. Incrementing retry counter: {retry_counter["volo"]}")
+            retry_counter[volo_config.ORGANIZATION] += 1
+            logger.warning(f"Execution failed. Incrementing retry counter: {retry_counter[volo_config.ORGANIZATION]}")
             logger.exception(e)
             new_events = []
         return new_events
@@ -107,6 +138,7 @@ async def main():
     df_seen_events = event_log.read_local_events(config.FILEPATH_EVENT_LOG)
     tasks = [
         asyncio.create_task(main_big_city(bc_config.URL_QUERY, df_seen_events)),
+        asyncio.create_task(main_new_york_urban(nyu_config.URL_QUERY, df_seen_events)),
         asyncio.create_task(main_volo(volo_config.URL_QUERY, df_seen_events))
     ]
     event_lists = await asyncio.gather(*tasks)
@@ -126,6 +158,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    retry_counter = {"volo": 0, "big_city": 0}
+    retry_counter = {bc_config.ORGANIZATION: 0, nyu_config.ORGANIZATION: 0, volo_config.ORGANIZATION: 0}
     while True:
         asyncio.run(main())
