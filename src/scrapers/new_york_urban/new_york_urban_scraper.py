@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from src import config
 from src.scrapers.new_york_urban import new_york_urban_config as nyu_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(nyu_config.LOGGER_NAME)
 
 
 def load_query_results_page(driver, url: str) -> None:
@@ -46,6 +46,7 @@ def get_event_info(event_element) -> dict:
 
 
 def get_events(driver, url: str) -> list[dict]:
+    logger.info(f"Getting events...")
     load_query_results_page(driver, url)
     venue_elements = driver.find_elements(By.CSS_SELECTOR, "div.register_bbtab a")
     events = []
@@ -57,39 +58,53 @@ def get_events(driver, url: str) -> list[dict]:
         table_element = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'Date')]]")
         soup = BeautifulSoup(table_element.get_attribute("outerHTML"), "html.parser")
         event_rows = soup.find_all("tr")[1:]
+        venue_event_count = 0
         for event_row in event_rows:
             try:
                 events.append(get_event_info(event_row))
+                venue_event_count += 1
+                logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
             except Exception as e:
                 logger.exception(f"Exception raised when collecting event info for venue {venue_element.text}: {e}")
+        logger.info(f"Retrieved event info for {venue_event_count} events at venue {venue_element.text}.")
+    logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 
 
 def remove_full_events(events: list) -> list:
+    logger.info("Removing full events...")
+    num_total_events = len(events)
     i = 0
     while i < len(events):
         if events[i]["status"] == "Sold Out":
-            events.pop(i)
+            logger.debug(f"Event ID {events.pop(i)['event_id']} removed.")
         else:
             i += 1
+    logger.info(f"{num_total_events - len(events)} of {num_total_events} removed. {len(events)} remaining.")
     return events
 
 
 def remove_seen_events(new_events: list, existing_event_ids: list):
+    logger.info("Removing seen events...")
+    num_total_events = len(new_events)
     i = 0
     while i < len(new_events):
         if new_events[i]["event_id"] in existing_event_ids:
-            new_events.pop(i)
+            logger.debug(f"Event ID {new_events.pop(i)['event_id']} removed.")
         else:
             i += 1
+    logger.info(f"{num_total_events - len(new_events)} of {num_total_events} removed. {len(new_events)} remaining.")
     return new_events
 
 
-def remove_beginner_events(new_events: list):
+def remove_beginner_events(events: list):
+    logger.info("Removing beginner events...")
+    num_total_events = len(events)
     i = 0
-    while i < len(new_events):
-        if "Beg" in new_events[i]["level"]:
-            new_events.pop(i)
+    while i < len(events):
+        if "Beg" in events[i]["level"]:
+            logger.debug(f"Event ID {events.pop(i)['event_id']} removed.")
         else:
             i += 1
-    return new_events
+    logger.info(f"{num_total_events - len(events)} of {num_total_events} removed. {len(events)} remaining.")
+    return events

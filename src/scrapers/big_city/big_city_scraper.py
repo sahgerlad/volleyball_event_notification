@@ -48,7 +48,6 @@ def get_event_info(event_element) -> dict:
     price = None
     if event_details:
         price = event_details.pop(0)
-    logger.debug(f"Retrieved event ID {event_id}.")
     return {
         "organization": bc_config.ORG_DISPLAY_NAME,
         "event_id": event_id,
@@ -99,12 +98,13 @@ def get_events(driver, url: str) -> list[dict]:
     for i, event_element in enumerate(event_elements):
         try:
             events.append(get_event_info(event_element))
+            logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
         except Exception as e:
             logger.exception(f"Exception raised when collecting event info for index {i}: {e}")
     for event_info in events:
         if event_info["status"] == "Upcoming":
             event_info["registration_date"] = get_registration_datetime(driver, event_info["url"])
-    logger.info("Retrieved all event info.")
+    logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 
 
@@ -139,5 +139,3 @@ def keep_advanced_events(events: list[dict]):
             i += 1
     logger.info(f"{num_total_events - len(events)} of {num_total_events} removed. {len(events)} remaining.")
     return events
-
-
