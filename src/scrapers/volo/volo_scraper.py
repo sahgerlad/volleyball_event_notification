@@ -175,6 +175,10 @@ def get_events(driver, url: str, account_login: bool, existing_events: list = No
                     account_login
                     and (event_info["start_time"] - dt.now()).total_seconds() > volo_config.SIGNUP_NOTICE
                     and check_free_event(driver)
+                    and not (
+                        event_info["start_time"].hour == 18
+                        and (event_info["end_time"] - event_info["start_time"]).seconds <= 3600
+                    )
                 ):
                     registration_confirmed = event_registration(driver)
                 event_info["registered"] = registration_confirmed
