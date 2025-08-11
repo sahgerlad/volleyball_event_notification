@@ -166,4 +166,8 @@ async def main():
 if __name__ == "__main__":
     retry_counter = {bc_config.ORGANIZATION: 0, nyu_config.ORGANIZATION: 0, volo_config.ORGANIZATION: 0}
     while True:
-        asyncio.run(main())
+        try:
+            asyncio.run(main())
+        except Exception as e:
+            logger.warning(f"Main execution failed.")
+            logger.exception(e)

@@ -54,7 +54,7 @@ def get_events(driver, url: str) -> list[dict]:
     for venue_element in venue_elements:
         venue_element.click()
         time.sleep(config.SLEEP_TIME_ELEMENT_LOAD)
-        if driver.find_elements(By.XPATH, "//*[contains(text(), '!! NO OPEN SESSION AVAILABLE !!')]"):
+        if driver.find_elements(By.XPATH, "//*[contains(text(), 'NO OPEN SESSION')]"):
             continue
         table_element = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'Date')]]")
         soup = BeautifulSoup(table_element.get_attribute("outerHTML"), "html.parser")
