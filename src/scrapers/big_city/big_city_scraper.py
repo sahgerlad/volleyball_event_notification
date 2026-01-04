@@ -36,9 +36,12 @@ def get_event_info(event_element) -> dict:
         event_details.pop(0)
     level = event_details.pop(0).split(" ")[0]
     event_times = event_details.pop(0).split(" - ")
-    start_datetime = dt.strptime(event_times[0], "%b %d %I:%M %p").replace(year=dt.now().year)
-    if start_datetime < dt.now():
-        start_datetime = start_datetime.replace(start_datetime.year + 1)
+    try:
+        start_datetime = dt.strptime(event_times[0], "%b %d, %Y %I:%M %p")
+    except ValueError:
+        start_datetime = dt.strptime(event_times[0], "%b %d %I:%M %p").replace(year=dt.now().year)
+        if start_datetime < dt.now():
+            start_datetime = start_datetime.replace(year=start_datetime.year + 1)
     if len(event_times[1].split(" ")) > 2:
         event_times[1] = " ".join(event_times[1].split(" ")[:2])
     end_datetime = dt.strptime(event_times[1], "%I:%M %p")

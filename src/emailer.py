@@ -28,12 +28,10 @@ def event_info_string(event_info, indent=4):
     if event_info.get("status"):
         string += f"\n{indent}Status: {event_info['status']}"
     if event_info.get("registration_date"):
-        string += (
-            f"\n{indent}Registration Open Date: "
-            f"{event_info['registration_date'].strftime(
-                f'%{strftime_modifier}m/%{strftime_modifier}d (%A) %{strftime_modifier}I:%M %p'
-            )}"
+        reg_date_str = event_info['registration_date'].strftime(
+            f'%{strftime_modifier}m/%{strftime_modifier}d (%A) %{strftime_modifier}I:%M %p'
         )
+        string += f"\n{indent}Registration Open Date: {reg_date_str}"
     string += f"\n{indent}Link: {event_info['url']}"
     return string
 
@@ -49,7 +47,7 @@ def create_email_content_events(event_lists, retry_counter):
     if num_jobs_failed:
         for org in retry_counter:
             if retry_counter[org]:
-                event_infos.append(f"{org.replace("_", " ").title()} job has failed {retry_counter[org]} consecutive times.")
+                event_infos.append(f"{org.replace('_', ' ').title()} job has failed {retry_counter[org]} consecutive times.")
     subject = "Volleyball Event Notification: "
     if num_events_found and num_jobs_failed:
         subject += f"{num_events_found} New Events, {num_jobs_failed} Jobs Failed"

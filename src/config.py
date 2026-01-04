@@ -9,6 +9,7 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")
 # Main config
 FILEPATH_LOG = "log/log_{date}.txt"
 FILEPATH_EVENT_LOG = "data/event_log.csv"
+FILEPATH_RETRY_COUNTER = "data/retry_counter.json"
 LOGGER_NAME = "main_logger"
 SLEEP_TIME = 600
 RETRY_LIMIT = 5

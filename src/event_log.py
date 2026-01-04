@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -42,3 +43,27 @@ def concat_dfs(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     df1 = df1.reindex(columns=list(all_columns))
     df2 = df2.reindex(columns=list(all_columns))
     return pd.concat([df1, df2], ignore_index=True)
+
+
+def read_retry_counter(file_path: str, default_organizations: dict) -> dict:
+    logger.info(f"Reading retry counter from {file_path}...")
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                retry_counter = json.load(f)
+            logger.info(f"Retrieved retry counter: {retry_counter}")
+            return retry_counter
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read retry counter file: {e}. Using defaults.")
+    else:
+        logger.info("Retry counter file not found. Using defaults.")
+    return default_organizations.copy()
+
+
+def write_retry_counter(file_path: str, retry_counter: dict) -> None:
+    logger.info(f"Writing retry counter to {file_path}...")
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, 'w') as f:
+        json.dump(retry_counter, f, indent=2)
+    logger.info(f"Retry counter written: {retry_counter}")
+    return
