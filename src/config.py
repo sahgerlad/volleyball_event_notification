@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Email config
 SMTP_PORT = 587
@@ -11,12 +14,10 @@ FILEPATH_LOG = "log/log_{date}.txt"
 FILEPATH_EVENT_LOG = "data/event_log.csv"
 FILEPATH_RETRY_COUNTER = "data/retry_counter.json"
 LOGGER_NAME = "main_logger"
-SLEEP_TIME = 600
 RETRY_LIMIT = 5
-SLEEP_TIME_RETRY = 60
 
-# Web scraper config
-SLEEP_TIME_PAGE_LOAD = 5
-SLEEP_TIME_URL_LOAD = 1
-SLEEP_TIME_ELEMENT_LOAD = 1
+# Web scraper config (times in milliseconds for Playwright)
+SLEEP_TIME_PAGE_LOAD = 5_000
+SLEEP_TIME_URL_LOAD = 1_000
+SLEEP_TIME_ELEMENT_LOAD = 1_000
 LOAD_PAGE_LIMIT = 30

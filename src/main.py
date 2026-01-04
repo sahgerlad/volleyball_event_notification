@@ -1,11 +1,9 @@
 import logging
 import os
-import time
 import datetime as dt
 import asyncio
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from playwright.async_api import async_playwright
 import pandas as pd
 
 from src import event_log, emailer, config
@@ -37,104 +35,106 @@ def create_logger(path_log: str = None, logger_name: str = None):
     return logger
 
 
-def start_browser(headless=True, logger=None):
+async def start_browser(headless=True, logger=None):
     if logger is None:
         logger = logging.getLogger(config.LOGGER_NAME)
     logger.info("Starting browser...")
-    chrome_options = Options()
-    if headless:
-        chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.set_window_size(1920, 1080)
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(headless=headless)
+    context = await browser.new_context(viewport={"width": 1920, "height": 1080})
+    page = await context.new_page()
     logger.info("Browser started.")
-    return driver
+    return playwright, browser, page
 
 
 async def main_big_city(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-    def big_city(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-        use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
-        logger = create_logger(
-            bc_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
-            bc_config.LOGGER_NAME
-        )
-        logger.info(f"Starting {bc_config.ORG_DISPLAY_NAME} scraper on {url}...")
-        df_seen_events = df_seen_events[df_seen_events["organization"] == bc_config.ORG_DISPLAY_NAME]
-        try:
-            driver = start_browser(logger=logger)
-            new_events = bc_scraper.get_events(driver, url)
-            new_events = bc_scraper.keep_advanced_events(new_events)
-            new_events = bc_scraper.remove_seen_events(new_events, df_seen_events)
-            for event in new_events:
-                logger.info(f"Found new event ID: {event['event_id']}")
-            logger.info(f"{bc_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
-            return new_events, True
-        except Exception as e:
-            logger.warning(f"Execution failed.")
-            logger.exception(e)
-            return [], False
-        finally:
-            driver.quit()
-    return await asyncio.to_thread(big_city, url, df_seen_events)
+    use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
+    logger = create_logger(
+        bc_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
+        bc_config.LOGGER_NAME
+    )
+    logger.info(f"Starting {bc_config.ORG_DISPLAY_NAME} scraper on {url}...")
+    df_seen_events = df_seen_events[df_seen_events["organization"] == bc_config.ORG_DISPLAY_NAME]
+    playwright, browser, page = None, None, None
+    try:
+        playwright, browser, page = await start_browser(logger=logger)
+        new_events = await bc_scraper.get_events(page, url)
+        new_events = bc_scraper.keep_advanced_events(new_events)
+        new_events = bc_scraper.remove_seen_events(new_events, df_seen_events)
+        for event in new_events:
+            logger.info(f"Found new event ID: {event['event_id']}")
+        logger.info(f"{bc_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
+        return new_events, True
+    except Exception as e:
+        logger.warning(f"Execution failed.")
+        logger.exception(e)
+        return [], False
+    finally:
+        if browser:
+            await browser.close()
+        if playwright:
+            await playwright.stop()
 
 
 async def main_new_york_urban(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-    def new_york_urban(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-        use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
-        logger = create_logger(
-            nyu_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
-            nyu_config.LOGGER_NAME
-        )
-        logger.info(f"Starting {nyu_config.ORG_DISPLAY_NAME} scraper on {url}...")
-        try:
-            driver = start_browser(logger=logger)
-            new_events = nyu_scraper.get_events(driver, url)
-            new_events = nyu_scraper.remove_beginner_events(new_events)
-            new_events = nyu_scraper.remove_full_events(new_events)
-            new_events = nyu_scraper.remove_seen_events(new_events, df_seen_events)
-            for event in new_events:
-                logger.info(f"Found new event ID: {event['event_id']}")
-            logger.info(f"{nyu_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
-            return new_events, True
-        except Exception as e:
-            logger.warning(f"Execution failed.")
-            logger.exception(e)
-            return [], False
-        finally:
-            driver.quit()
-    return await asyncio.to_thread(new_york_urban, url, df_seen_events)
+    use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
+    logger = create_logger(
+        nyu_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
+        nyu_config.LOGGER_NAME
+    )
+    logger.info(f"Starting {nyu_config.ORG_DISPLAY_NAME} scraper on {url}...")
+    playwright, browser, page = None, None, None
+    try:
+        playwright, browser, page = await start_browser(logger=logger)
+        new_events = await nyu_scraper.get_events(page, url)
+        new_events = nyu_scraper.remove_beginner_events(new_events)
+        new_events = nyu_scraper.remove_full_events(new_events)
+        new_events = nyu_scraper.remove_seen_events(new_events, df_seen_events)
+        for event in new_events:
+            logger.info(f"Found new event ID: {event['event_id']}")
+        logger.info(f"{nyu_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
+        return new_events, True
+    except Exception as e:
+        logger.warning(f"Execution failed.")
+        logger.exception(e)
+        return [], False
+    finally:
+        if browser:
+            await browser.close()
+        if playwright:
+            await playwright.stop()
 
 
 async def main_volo(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-    def volo(url: str, df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
-        use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
-        logger = create_logger(
-            volo_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
-            volo_config.LOGGER_NAME
+    use_file_logging = os.environ.get("GITHUB_ACTIONS") is None
+    logger = create_logger(
+        volo_config.FILEPATH_LOG.format(date=dt.date.today().strftime("%Y-%m-%d")) if use_file_logging else None,
+        volo_config.LOGGER_NAME
+    )
+    logger.info(f"Starting {volo_config.ORG_DISPLAY_NAME} scraper on {url}...")
+    seen_event_ids = df_seen_events[df_seen_events["organization"] == volo_config.ORG_DISPLAY_NAME]["event_id"].to_list()
+    playwright, browser, page = None, None, None
+    try:
+        playwright, browser, page = await start_browser(logger=logger)
+        context = page.context
+        account_login = await volo_scraper.login_to_account(
+            context,
+            volo_config.URL_ACCOUNT_LOGIN,
+            volo_config.USERNAME,
+            volo_config.PASSWORD
         )
-        logger.info(f"Starting {volo_config.ORG_DISPLAY_NAME} scraper on {url}...")
-        seen_event_ids = df_seen_events[df_seen_events["organization"] == volo_config.ORG_DISPLAY_NAME]["event_id"].to_list()
-        try:
-            driver = start_browser(logger=logger)
-            account_login = volo_scraper.login_to_account(
-                driver,
-                volo_config.URL_ACCOUNT_LOGIN,
-                volo_config.USERNAME,
-                volo_config.PASSWORD
-            )
-            new_events = volo_scraper.get_events(driver, url, account_login, seen_event_ids)
-            logger.info(f"{volo_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
-            return new_events, True
-        except Exception as e:
-            logger.warning(f"Execution failed.")
-            logger.exception(e)
-            return [], False
-        finally:
-            driver.quit()
-    return await asyncio.to_thread(volo, url, df_seen_events)
+        new_events = await volo_scraper.get_events(page, url, account_login, seen_event_ids)
+        logger.info(f"{volo_config.ORG_DISPLAY_NAME} webscrape completed successfully. Found {len(new_events)} new events.")
+        return new_events, True
+    except Exception as e:
+        logger.warning(f"Execution failed.")
+        logger.exception(e)
+        return [], False
+    finally:
+        if browser:
+            await browser.close()
+        if playwright:
+            await playwright.stop()
 
 
 async def main():

@@ -1,9 +1,7 @@
 import logging
-import time
 from datetime import datetime as dt
 
 import pandas as pd
-from selenium.webdriver.common.by import By
 
 from src import config
 from src.scrapers.big_city import big_city_config as bc_config
@@ -11,24 +9,26 @@ from src.scrapers.big_city import big_city_config as bc_config
 logger = logging.getLogger(bc_config.LOGGER_NAME)
 
 
-def load_query_results_page(driver, url: str) -> None:
+async def load_query_results_page(page, url: str) -> None:
     logger.debug(f"Loading {bc_config.ORG_DISPLAY_NAME} query page: {url}...")
-    driver.get(url)
-    time.sleep(config.SLEEP_TIME_PAGE_LOAD)
-    iframe = driver.find_element(By.TAG_NAME, "iframe")
-    driver.switch_to.frame(iframe)
-    load_more_button = driver.find_elements(By.XPATH, "//span[text()='Load More']")
-    while load_more_button:
-        load_more_button[0].click()
-        time.sleep(config.SLEEP_TIME_URL_LOAD)
-        load_more_button = driver.find_elements(By.XPATH, "//span[text()='Load More']")
+    await page.goto(url)
+    await page.wait_for_load_state("networkidle")
+    iframe = page.frame_locator("iframe[src*='opensports.net']")
+    while True:
+        load_more_button = iframe.locator("xpath=//span[text()='Load More']")
+        if await load_more_button.count() == 0:
+            break
+        await load_more_button.first.click()
+        await page.wait_for_timeout(config.SLEEP_TIME_URL_LOAD)
     logger.debug(f"{bc_config.ORG_DISPLAY_NAME} query page loaded.")
+    return iframe
 
 
-def get_event_info(event_element) -> dict:
-    url = event_element.find_element(*(By.CSS_SELECTOR, "a")).get_attribute("href")
+async def get_event_info(event_locator) -> dict:
+    url = await event_locator.locator("a").first.get_attribute("href")
     event_id = url.split("/")[4].split("?")[0]
-    event_details = event_element.text.split("\n")
+    event_text = await event_locator.inner_text()
+    event_details = event_text.split("\n")
     status = "Available"
     if event_details[0] in ["Filled", "Upcoming"]:
         status = event_details.pop(0)
@@ -40,7 +40,7 @@ def get_event_info(event_element) -> dict:
         start_datetime = dt.strptime(event_times[0], "%b %d, %Y %I:%M %p")
     except ValueError:
         start_datetime = dt.strptime(event_times[0], "%b %d %I:%M %p").replace(year=dt.now().year)
-        if start_datetime < dt.now():
+        if start_datetime.date() < dt.now().date():
             start_datetime = start_datetime.replace(year=start_datetime.year + 1)
     if len(event_times[1].split(" ")) > 2:
         event_times[1] = " ".join(event_times[1].split(" ")[:2])
@@ -65,48 +65,49 @@ def get_event_info(event_element) -> dict:
     }
 
 
-def get_registration_datetime(driver, url: str) -> dt:
+async def get_registration_datetime(page, url: str) -> dt:
     logger.debug(f"Getting registration date on url: {url}...")
-    driver.execute_script("window.open('');")
-    driver.switch_to.window(driver.window_handles[1])
+    context = page.context
+    new_page = await context.new_page()
     try:
-        driver.get(url)
-        time.sleep(config.SLEEP_TIME_PAGE_LOAD)
-        reg_element = driver.find_element(By.XPATH, "//span[contains(text(), 'Registration starts')]")
+        await new_page.goto(url)
+        await new_page.wait_for_load_state("networkidle")
+        reg_element = new_page.locator("xpath=//span[contains(text(), 'Registration starts')]")
+        reg_text = await reg_element.inner_text()
         reg_datetime = (
             dt
-            .strptime(reg_element.text, "Registration starts %b %d %I:%M %p")
+            .strptime(reg_text, "Registration starts %b %d %I:%M %p")
             .replace(year=dt.now().year)
         )
-        if reg_datetime < dt.now():
-            reg_datetime = reg_datetime.replace(reg_datetime.year + 1)
+        if reg_datetime.date() < dt.now().date():
+            reg_datetime = reg_datetime.replace(year=reg_datetime.year + 1)
         logger.debug(f"Found registration date: {reg_datetime}")
     except Exception as e:
         logger.exception(f"Exception raised when collecting the registration datetime on url {url}: {e}")
         reg_datetime = None
-    driver.close()
-    driver.switch_to.window(driver.window_handles[0])
+    finally:
+        await new_page.close()
     return reg_datetime
 
 
-def get_events(driver, url: str) -> list[dict]:
+async def get_events(page, url: str) -> list[dict]:
     logger.info(f"Getting events...")
-    load_query_results_page(driver, url)
+    iframe = await load_query_results_page(page, url)
     events = []
-    event_elements = (
-        driver
-        .find_element(By.CSS_SELECTOR, '[class*="Games_cardsContainer"]')
-        .find_elements(By.XPATH, "./*")
-    )
-    for i, event_element in enumerate(event_elements):
+    cards_container = iframe.locator('[class*="Games_cardsContainer"]')
+    event_elements = cards_container.locator("> *")
+    count = await event_elements.count()
+    for i in range(count):
         try:
-            events.append(get_event_info(event_element))
+            event_locator = event_elements.nth(i)
+            event_info = await get_event_info(event_locator)
+            events.append(event_info)
             logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
         except Exception as e:
             logger.exception(f"Exception raised when collecting event info for index {i}: {e}")
     for event_info in events:
         if event_info["status"] == "Upcoming":
-            event_info["registration_date"] = get_registration_datetime(driver, event_info["url"])
+            event_info["registration_date"] = await get_registration_datetime(page, event_info["url"])
     logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 

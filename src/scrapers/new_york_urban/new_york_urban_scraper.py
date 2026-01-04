@@ -1,9 +1,7 @@
 import logging
-import time
 from datetime import datetime as dt
 
 import pandas as pd
-from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 
 from src import config
@@ -12,10 +10,10 @@ from src.scrapers.new_york_urban import new_york_urban_config as nyu_config
 logger = logging.getLogger(nyu_config.LOGGER_NAME)
 
 
-def load_query_results_page(driver, url: str) -> None:
+async def load_query_results_page(page, url: str) -> None:
     logger.debug(f"Loading {nyu_config.ORG_DISPLAY_NAME} query page: {url}...")
-    driver.get(url)
-    time.sleep(config.SLEEP_TIME_PAGE_LOAD)
+    await page.goto(url)
+    await page.wait_for_load_state("networkidle")
     logger.debug(f"{nyu_config.ORG_DISPLAY_NAME} query page loaded.")
 
 
@@ -46,18 +44,23 @@ def get_event_info(event_element) -> dict:
     }
 
 
-def get_events(driver, url: str) -> list[dict]:
+async def get_events(page, url: str) -> list[dict]:
     logger.info(f"Getting events...")
-    load_query_results_page(driver, url)
-    venue_elements = driver.find_elements(By.CSS_SELECTOR, "div.register_bbtab a")
+    await load_query_results_page(page, url)
+    venue_elements = page.locator("div.register_bbtab a")
+    venue_count = await venue_elements.count()
     events = []
-    for venue_element in venue_elements:
-        venue_element.click()
-        time.sleep(config.SLEEP_TIME_ELEMENT_LOAD)
-        if driver.find_elements(By.XPATH, "//*[contains(text(), 'NO OPEN SESSION')]"):
+    for idx in range(venue_count):
+        venue_element = venue_elements.nth(idx)
+        venue_text = await venue_element.inner_text()
+        await venue_element.click()
+        await page.wait_for_timeout(config.SLEEP_TIME_ELEMENT_LOAD)
+        no_session = page.locator("xpath=//*[contains(text(), 'NO OPEN SESSION')]")
+        if await no_session.count() > 0:
             continue
-        table_element = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'Date')]]")
-        soup = BeautifulSoup(table_element.get_attribute("outerHTML"), "html.parser")
+        table_element = page.locator("xpath=//table[.//th[contains(text(), 'Date')]]")
+        table_html = await table_element.evaluate("el => el.outerHTML")
+        soup = BeautifulSoup(table_html, "html.parser")
         event_rows = soup.find_all("tr")[1:]
         venue_event_count = 0
         for event_row in event_rows:
@@ -66,8 +69,8 @@ def get_events(driver, url: str) -> list[dict]:
                 venue_event_count += 1
                 logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
             except Exception as e:
-                logger.exception(f"Exception raised when collecting event info for venue {venue_element.text}: {e}")
-        logger.info(f"Retrieved event info for {venue_event_count} events at venue {venue_element.text}.")
+                logger.exception(f"Exception raised when collecting event info for venue {venue_text}: {e}")
+        logger.info(f"Retrieved event info for {venue_event_count} events at venue {venue_text}.")
     logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 
