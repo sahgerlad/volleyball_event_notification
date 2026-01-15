@@ -59,25 +59,27 @@ async def get_event_info(event_locator) -> dict:
         text_after_datetime = text_after_datetime.split("|", 1)[-1].strip()
     
     status = "Available"
-    if "Waitlist" in event_text:
-        status = "Waitlist"
-    elif "Filled" in event_text:
-        status = "Filled"
-    elif "Limited Spot" in event_text:
-        status = "Available"
+    button = event_locator.locator("button")
+    if await button.count() > 0:
+        is_disabled = await button.first.is_disabled()
+        if is_disabled:
+            status = "Upcoming"
+        elif "Waitlist" in event_text:
+            status = "Waitlist"
+        elif "Filled" in event_text:
+            status = "Filled"
+        elif "Limited Spot" in event_text:
+            status = "Available"
     
-    text_normalized = re.sub(r'\s+', ' ', text_after_datetime)
-    venue_pattern = r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:[A-Z]{1,3}(?:\s+[A-Z]{1,3})+\s*(?:\+\s*\d+|Join|Register)|Join|Register|\+\s*\d+)'
-    venue_match = re.search(venue_pattern, text_normalized)
-    if venue_match:
-        location = venue_match.group(1).strip()
+    location_element = event_locator.locator(
+        'span.Card_sectionPadding__H36_y[style*="font-size: 14px"][style*="margin-bottom: 10px"]'
+    )
+    if await location_element.count() > 0:
+        location = (await location_element.first.inner_text()).strip()
     else:
-        fallback_pattern = r'(?:all\s+spot\s+filled|going,?\s+all\s+spot\s+filled)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)'
-        fallback_match = re.search(fallback_pattern, text_normalized, re.IGNORECASE)
-        location = fallback_match.group(1).strip() if fallback_match else "Unknown"
-    location = re.sub(r'\s+[A-Z]{1,3}(\s+[A-Z]{1,3})*\s*$', '', location).strip()
-    
-    return {
+        location = "Unknown"
+
+    event_info = {
         "organization": bc_config.ORG_DISPLAY_NAME,
         "event_id": event_id,
         "location": location,
@@ -89,31 +91,8 @@ async def get_event_info(event_locator) -> dict:
         "url": url,
         "date_found": dt.now()
     }
-
-
-async def get_registration_datetime(page, url: str) -> dt:
-    logger.debug(f"Getting registration date on url: {url}...")
-    context = page.context
-    new_page = await context.new_page()
-    try:
-        await new_page.goto(url)
-        await new_page.wait_for_load_state("networkidle")
-        reg_element = new_page.locator("xpath=//span[contains(text(), 'Registration starts')]")
-        reg_text = await reg_element.inner_text()
-        reg_datetime = (
-            dt
-            .strptime(reg_text, "Registration starts %b %d %I:%M %p")
-            .replace(year=dt.now().year)
-        )
-        if reg_datetime.date() < dt.now().date():
-            reg_datetime = reg_datetime.replace(year=reg_datetime.year + 1)
-        logger.debug(f"Found registration date: {reg_datetime}")
-    except Exception as e:
-        logger.exception(f"Exception raised when collecting the registration datetime on url {url}: {e}")
-        reg_datetime = None
-    finally:
-        await new_page.close()
-    return reg_datetime
+    logger.debug(f"Event info: {event_info}")
+    return event_info
 
 
 async def get_events(page, url: str) -> list[dict]:
@@ -131,9 +110,6 @@ async def get_events(page, url: str) -> list[dict]:
             logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
         except Exception as e:
             logger.exception(f"Exception raised when collecting event info for index {i}: {e}")
-    for event_info in events:
-        if event_info["status"] == "Upcoming":
-            event_info["registration_date"] = await get_registration_datetime(page, event_info["url"])
     logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 
@@ -172,12 +148,12 @@ def keep_advanced_events(events: list[dict]):
 
 
 def keep_open_events(events: list[dict]):
-    logger.info("Keeping only open events (excluding filled and waitlist)...")
+    logger.info("Keeping only events with status 'Available'...")
     num_total_events = len(events)
     i = 0
     while i < len(events):
         status = events[i]["status"]
-        if status in ["Filled", "Waitlist"]:
+        if status != "Available":
             logger.debug(f"Event ID {events.pop(i)['event_id']} removed (status: {status}).")
         else:
             i += 1
