@@ -2,14 +2,18 @@ import logging
 import os
 import datetime as dt
 import asyncio
+from zoneinfo import ZoneInfo
 
-# from playwright.async_api import async_playwright
 import pandas as pd
 
 from src import event_log, emailer, config
 from src.scrapers.big_city import big_city_scraper as bc_scraper, big_city_config as bc_config
 from src.scrapers.new_york_urban import new_york_urban_scraper as nyu_scraper, new_york_urban_config as nyu_config
-# from src.scrapers.volo import volo_scraper, volo_config
+
+VOLO_ENABLED = os.environ.get("ENABLE_VOLO", "").lower() == "true"
+if VOLO_ENABLED:
+    from playwright.async_api import async_playwright
+    from src.scrapers.volo import volo_scraper, volo_config
 
 
 def create_logger(path_log: str = None, logger_name: str = None):
@@ -35,16 +39,16 @@ def create_logger(path_log: str = None, logger_name: str = None):
     return logger
 
 
-# async def start_browser(headless=True, logger=None):
-#     if logger is None:
-#         logger = logging.getLogger(config.LOGGER_NAME)
-#     logger.info("Starting browser...")
-#     playwright = await async_playwright().start()
-#     browser = await playwright.chromium.launch(headless=headless)
-#     context = await browser.new_context(viewport={"width": 1920, "height": 1080})
-#     page = await context.new_page()
-#     logger.info("Browser started.")
-#     return playwright, browser, page
+async def start_browser(headless=True, logger=None):
+    if logger is None:
+        logger = logging.getLogger(config.LOGGER_NAME)
+    logger.info("Starting browser...")
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(headless=headless)
+    context = await browser.new_context(viewport={"width": 1920, "height": 1080})
+    page = await context.new_page()
+    logger.info("Browser started.")
+    return playwright, browser, page
 
 
 async def main_big_city(df_seen_events: pd.DataFrame = None) -> tuple[list[dict], bool]:
@@ -136,8 +140,9 @@ async def main():
     scraper_configs = [
         (main_big_city, None, bc_config.ORGANIZATION),
         (main_new_york_urban, None, nyu_config.ORGANIZATION),
-        # (main_volo, volo_config.URL_QUERY, volo_config.ORGANIZATION)
     ]
+    if VOLO_ENABLED:
+        scraper_configs.append((main_volo, volo_config.URL_QUERY, volo_config.ORGANIZATION))
     org_keys = [org_key for _, _, org_key in scraper_configs]
     retry_counter = {org_key: 0 for org_key in org_keys}
     retry_counter = event_log.read_retry_counter(config.FILEPATH_RETRY_COUNTER, retry_counter)
@@ -175,7 +180,8 @@ async def main():
                 .concat_dfs(df_seen_events, df_new_events)
                 .drop_duplicates(subset=["event_id"], keep="last")
             )
-            df_events = df_events[df_events["start_time"] > dt.datetime.now()]
+            now_et = dt.datetime.now(ZoneInfo("America/New_York")).replace(tzinfo=None)
+            df_events = df_events[df_events["end_time"] > now_et]
             event_log.write_events(config.FILEPATH_EVENT_LOG, df_events)
     finally:
         event_log.write_retry_counter(config.FILEPATH_RETRY_COUNTER, retry_counter)

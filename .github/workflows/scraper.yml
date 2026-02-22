@@ -22,16 +22,11 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     
-    # - name: Cache Playwright browsers
-    #   uses: actions/cache@v4
-    #   id: playwright-cache
-    #   with:
-    #     path: ~/.cache/ms-playwright
-    #     key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-    
-    # - name: Install Playwright browsers
-    #   if: steps.playwright-cache.outputs.cache-hit != 'true'
-    #   run: playwright install chromium --with-deps
+    - name: Install Playwright (Volo only)
+      if: vars.ENABLE_VOLO == 'true'
+      run: |
+        pip install playwright
+        playwright install chromium --with-deps
     
     - name: Restore data files from cache
       uses: actions/cache/restore@v4
@@ -47,6 +42,7 @@ jobs:
       env:
         EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
         APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        ENABLE_VOLO: ${{ vars.ENABLE_VOLO }}
         VOLO_USERNAME: ${{ secrets.VOLO_USERNAME }}
         VOLO_PASSWORD: ${{ secrets.VOLO_PASSWORD }}
         GITHUB_ACTIONS: "true"

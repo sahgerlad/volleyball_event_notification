@@ -25,7 +25,7 @@ def fetch_events_from_api() -> list[dict]:
 
 def parse_event(api_event: dict) -> dict:
     alias_id = api_event["aliasID"]
-    event_id = alias_id.rsplit("-", 1)[-1]
+    event_id = alias_id.rstrip("-").rsplit("-", 1)[-1]
     event_url = urljoin(bc_config.BASE_URL, f"/posts/{alias_id}")
 
     tz = ZoneInfo(api_event.get("timeZone", "America/New_York"))
