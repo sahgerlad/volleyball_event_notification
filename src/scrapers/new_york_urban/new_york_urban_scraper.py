@@ -1,20 +1,30 @@
 import logging
+import urllib.request
+import urllib.parse
 from datetime import datetime as dt
 
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from src import config
 from src.scrapers.new_york_urban import new_york_urban_config as nyu_config
 
 logger = logging.getLogger(nyu_config.LOGGER_NAME)
 
 
-async def load_query_results_page(page, url: str) -> None:
-    logger.debug(f"Loading {nyu_config.ORG_DISPLAY_NAME} query page: {url}...")
-    await page.goto(url)
-    await page.wait_for_load_state("networkidle")
-    logger.debug(f"{nyu_config.ORG_DISPLAY_NAME} query page loaded.")
+def fetch_venue_html(venue: dict) -> str:
+    params = urllib.parse.urlencode({
+        "action": nyu_config.AJAX_ACTION,
+        "buttonid": venue["buttonid"],
+        "gametypeid": nyu_config.AJAX_GAMETYPE_ID,
+        "filterid": venue["filterid"],
+    })
+    req = urllib.request.Request(
+        nyu_config.AJAX_URL,
+        data=params.encode(),
+        headers=nyu_config.AJAX_HEADERS,
+    )
+    with urllib.request.urlopen(req) as resp:
+        return resp.read().decode()
 
 
 def get_event_info(event_element) -> dict:
@@ -44,23 +54,15 @@ def get_event_info(event_element) -> dict:
     }
 
 
-async def get_events(page, url: str) -> list[dict]:
-    logger.info(f"Getting events...")
-    await load_query_results_page(page, url)
-    venue_elements = page.locator("div.register_bbtab a")
-    venue_count = await venue_elements.count()
+def get_events() -> list[dict]:
+    logger.info("Getting events...")
     events = []
-    for idx in range(venue_count):
-        venue_element = venue_elements.nth(idx)
-        venue_text = await venue_element.inner_text()
-        await venue_element.click()
-        await page.wait_for_timeout(config.SLEEP_TIME_ELEMENT_LOAD)
-        no_session = page.locator("xpath=//*[contains(text(), 'NO OPEN SESSION')]")
-        if await no_session.count() > 0:
+    for venue in nyu_config.VENUES:
+        html = fetch_venue_html(venue)
+        if "NO OPEN SESSION" in html:
+            logger.info(f"No events at venue {venue['name']}.")
             continue
-        table_element = page.locator("xpath=//table[.//th[contains(text(), 'Date')]]")
-        table_html = await table_element.evaluate("el => el.outerHTML")
-        soup = BeautifulSoup(table_html, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
         event_rows = soup.find_all("tr")[1:]
         venue_event_count = 0
         for event_row in event_rows:
@@ -69,8 +71,8 @@ async def get_events(page, url: str) -> list[dict]:
                 venue_event_count += 1
                 logger.debug(f"Retrieved event ID {events[-1]['event_id']}.")
             except Exception as e:
-                logger.exception(f"Exception raised when collecting event info for venue {venue_text}: {e}")
-        logger.info(f"Retrieved event info for {venue_event_count} events at venue {venue_text}.")
+                logger.exception(f"Exception raised when collecting event info for venue {venue['name']}: {e}")
+        logger.info(f"Retrieved event info for {venue_event_count} events at venue {venue['name']}.")
     logger.info(f"Retrieved event info for {len(events)} events.")
     return events
 

@@ -1,4 +1,4 @@
 beautifulsoup4==4.13.3
 pandas==2.2.3
-playwright==1.49.1
+# playwright==1.49.1
 python-dotenv==1.0.1
